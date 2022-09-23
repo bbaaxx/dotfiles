@@ -1,5 +1,5 @@
 #!/bin/bash
 
-sh -c "$(curl -fsLS https://chezmoi.io/get)" -- init --apply $GITHUB_USER
 sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+sh -c "$(curl -fsLS https://chezmoi.io/get)" -- init --apply $GITHUB_USER
 
