@@ -83,6 +83,18 @@ plugins=(
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
+autoSuggestionsTarget=$ZSH_CUSTOM/plugins/zsh-autosuggestions
+autoSuggestionsRepo=https://github.com/zsh-users/zsh-autosuggestions
+syntaxHighlightTarget=$ZSH_CUSTOM/plugins/zsh-syntax-highlighting
+syntaxHighlightRepo=https://github.com/zsh-users/zsh-syntax-highlighting.git
+pl1okRepo=https://github.com/romkatv/powerlevel10k.git
+pl10kTarget=$ZSH_CUSTOM/themes/powerlevel10k
+
+if ! git clone "$autoSuggestionsRepo" "$autoSuggestionsTarget" 2>/dev/null && [ -d "${autoSuggestionsTarget}" ] ; then
+    echo "Clone failed because the folder ${folder} exists"
+fi
+
+# git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
 
 source $ZSH/oh-my-zsh.sh
 
