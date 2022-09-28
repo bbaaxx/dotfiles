@@ -90,8 +90,8 @@ syntaxHighlightRepo=https://github.com/zsh-users/zsh-syntax-highlighting.git
 pl1okRepo=https://github.com/romkatv/powerlevel10k.git
 pl10kTarget=$ZSH_CUSTOM/themes/powerlevel10k
 
-if ! git clone "$autoSuggestionsRepo" "$autoSuggestionsTarget" 2>/dev/null && [ -d "${autoSuggestionsTarget}" ] ; then
-    echo "Clone failed because the folder ${folder} exists"
+if ! git clone $autoSuggestionsRepo $autoSuggestionsTarget 2>/dev/null && [ -d "$autoSuggestionsTarget" ] ; then
+    echo "Clone failed because the folder $autoSuggestionsTarget exists"
 fi
 
 # git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
