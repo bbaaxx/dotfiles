@@ -83,7 +83,8 @@ plugins=(
   docker
   git
   history
-  hitchiker
+  hitchhiker
+  jira
   zsh-autosuggestions
   zsh-syntax-highlighting
 )
