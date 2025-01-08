@@ -4,6 +4,7 @@
     exact = true
     stripComponents = 1
     refreshPeriod = "168h"
+    exclude = ["*/cache/**"]
 [".oh-my-zsh/custom/plugins/zsh-syntax-highlighting"]
     type = "archive"
     url = "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz"
@@ -22,3 +23,4 @@
     url = "https://github.com/romkatv/powerlevel10k/archive/master.tar.gz"
     exact = true
     stripComponents = 1
+    exclude = ["*.zwc"]
