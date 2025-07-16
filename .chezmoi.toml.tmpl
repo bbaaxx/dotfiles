@@ -1,11 +1,23 @@
 {{- /* Checks if running interactively, which is not the case for GitHub Codespaces */ -}}
 {{- $interactive := stdinIsATTY -}}
 
+{{- /* Check if we're in a CI/automated environment */ -}}
+{{- $isCI := or (env "CI") (env "GITHUB_ACTIONS") (env "CODESPACES") -}}
+
+{{- /* Check if Dashlane CLI is available */ -}}
+{{- $hasDashlane := lookPath "dcli" -}}
+
+{{- /* Determine if we should use Dashlane (interactive + CLI available + not CI) */ -}}
+{{- $useDashlane := and $interactive $hasDashlane (not $isCI) -}}
+
 {{- /* Initializes the name variable with a default value */ -}}
 {{- $name := "Your Name" -}}
 {{- /* If name was previously set, reuses it */ -}}
 {{- if hasKey . "name" -}}
 {{-   $name = .name -}}
+{{- /* Try to get from Dashlane if available */ -}}
+{{- else if $useDashlane -}}
+{{-   $name = (dashlane "personal-info").title | default "Your Name" -}}
 {{- /* Otherwise, if running interactively, prompts for a name */ -}}
 {{- else if $interactive -}}
 {{-   $name = promptString "name" $name -}}
@@ -15,6 +27,8 @@
 {{- $email := "your@email.com" -}}
 {{- if hasKey . "email" -}}
 {{-   $email = .email -}}
+{{- else if $useDashlane -}}
+{{-   $email = (dashlane "personal-info").login | default "your@email.com" -}}
 {{- else if $interactive -}}
 {{-   $email = promptString "email" $email -}}
 {{- end -}}
@@ -23,11 +37,23 @@
 {{-   writeToStdout "💡 Tip: you can re-enter your name and email with `chezmoi init --data=false`.\n" -}}
 {{- end -}}
 
+{{- if $useDashlane -}}
+{{-   writeToStdout "🔐 Using Dashlane for credential management.\n" -}}
+{{- else if $hasDashlane -}}
+{{-   writeToStdout "⚠️  Dashlane CLI detected but not using (non-interactive session).\n" -}}
+{{- else -}}
+{{-   writeToStdout "ℹ️  Dashlane CLI not available - using fallback configuration.\n" -}}
+{{- end -}}
+
 sourceDir = "{{ .chezmoi.sourceDir }}"
 
 [data]
   name = "{{ $name }}"
   email = "{{ $email }}"
+  interactive = {{ $interactive }}
+  hasDashlane = {{ $hasDashlane }}
+  useDashlane = {{ $useDashlane }}
+  isCI = {{ $isCI }}
   
 [git]
   autoCommit = false
