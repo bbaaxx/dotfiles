@@ -1,5 +1,5 @@
-{{- /* Checks if running interactively, which is not the case for GitHub Codespaces */ -}}
-{{- $interactive := stdinIsATTY -}}
+{{- /* Checks if running interactively using environment detection */ -}}
+{{- $interactive := not (or (env "CI") (env "GITHUB_ACTIONS") (env "CODESPACES") (env "SSH_CLIENT") (env "TERM" | eq "dumb")) -}}
 
 {{- /* Check if we're in a CI/automated environment */ -}}
 {{- $isCI := or (env "CI") (env "GITHUB_ACTIONS") (env "CODESPACES") -}}
@@ -10,29 +10,60 @@
 {{- /* Determine if we should use Dashlane (interactive + CLI available + not CI) */ -}}
 {{- $useDashlane := and $interactive $hasDashlane (not $isCI) -}}
 
-{{- /* Initializes the name variable with a default value */ -}}
+{{- /* Initialize variables with defaults */ -}}
 {{- $name := "Your Name" -}}
-{{- /* If name was previously set, reuses it */ -}}
+{{- $email := "your@email.com" -}}
+{{- $gitSigningKey := "" -}}
+{{- $githubUsername := "" -}}
+
+{{- /* Try to get data from Dashlane if available */}}
+{{- if $useDashlane -}}
+{{-   $dashlaneNote := "" -}}
+{{- /* Retrieve the note - dashlaneNote function handles errors internally */}}
+{{-   $dashlaneNote = dashlaneNote "dot-config-personal" -}}
+
+{{- /* Parse the note content if we got it */}}
+{{-   if $dashlaneNote -}}
+{{- /* Split the note content into lines and parse key-value pairs */}}
+{{-     range ($dashlaneNote | splitList "\n") -}}
+{{-       if . | contains ":" -}}
+{{-         $parts := . | splitList ":" -}}
+{{-         if ge (len $parts) 2 -}}
+{{-           $key := index $parts 0 | trim -}}
+{{-           $value := slice $parts 1 | join ":" | trim -}}
+{{- /* Update variables based on the key */}}
+{{-           if eq $key "name" -}}
+{{-             $name = $value -}}
+{{-           else if eq $key "email" -}}
+{{-             $email = $value -}}
+{{-           else if eq $key "git_signing_key" -}}
+{{-             $gitSigningKey = $value -}}
+{{-           else if eq $key "github_username" -}}
+{{-             $githubUsername = $value -}}
+{{-           end -}}
+{{-         end -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* If name was previously set in data, reuse it (takes precedence over Dashlane) */ -}}
 {{- if hasKey . "name" -}}
 {{-   $name = .name -}}
-{{- /* Try to get from Dashlane if available */ -}}
-{{- else if $useDashlane -}}
-{{-   $name = (dashlane "personal-info").title | default "Your Name" -}}
-{{- /* Otherwise, if running interactively, prompts for a name */ -}}
-{{- else if $interactive -}}
-{{-   $name = promptString "name" $name -}}
 {{- end -}}
 
-{{- /* Does the same for the email */ -}}
-{{- $email := "your@email.com" -}}
+{{- /* Same for email */ -}}
 {{- if hasKey . "email" -}}
 {{-   $email = .email -}}
-{{- else if $useDashlane -}}
-{{-   $email = (dashlane "personal-info").login | default "your@email.com" -}}
-{{- else if $interactive -}}
-{{-   $email = promptString "email" $email -}}
 {{- end -}}
 
+{{- /* Interactive prompts as fallback when not using Dashlane or in case of missing data */ -}}
+{{- if and $interactive (not $useDashlane) -}}
+{{-   $name = promptStringOnce . "name" "Enter your full name" $name -}}
+{{-   $email = promptStringOnce . "email" "Enter your email address" $email -}}
+{{- end -}}
+
+{{- /* Display status messages */ -}}
 {{- if $interactive -}}
 {{-   writeToStdout "💡 Tip: you can re-enter your name and email with `chezmoi init --data=false`.\n" -}}
 {{- end -}}
@@ -50,11 +81,24 @@ sourceDir = "{{ .chezmoi.sourceDir }}"
 [data]
   name = "{{ $name }}"
   email = "{{ $email }}"
-  interactive = {{ $interactive }}
-  hasDashlane = {{ $hasDashlane }}
-  useDashlane = {{ $useDashlane }}
-  isCI = {{ $isCI }}
+  gitSigningKey = "{{ $gitSigningKey }}"
+  githubUsername = "{{ $githubUsername }}"
+  interactive = {{ if $interactive }}true{{ else }}false{{ end }}
+  hasDashlane = {{ if $hasDashlane }}true{{ else }}false{{ end }}
+  useDashlane = {{ if $useDashlane }}true{{ else }}false{{ end }}
+  isCI = {{ if $isCI }}true{{ else }}false{{ end }}
   
 [git]
   autoCommit = false
   autoPush = false
+
+{{- /* Configure git signing if we have a signing key */}}
+{{- if $gitSigningKey }}
+[[git.config]]
+  key = "user.signingkey"
+  value = "{{ $gitSigningKey }}"
+  
+[[git.config]]
+  key = "commit.gpgsign"
+  value = "true"
+{{- end }}
