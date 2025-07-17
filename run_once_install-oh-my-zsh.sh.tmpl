@@ -1,0 +1,230 @@
+#!/bin/bash
+
+set -euo pipefail
+
+{{- /* This script installs Oh My Zsh and required plugins */}}
+
+OMZ_DIR="$HOME/.oh-my-zsh"
+CUSTOM_DIR="$OMZ_DIR/custom"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Helper functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+echo "🚀 Installing Oh My Zsh and plugins..."
+
+# Function to download and extract archive
+download_and_extract() {
+    local url="$1"
+    local dest="$2"
+    # Create a safe temp directory name by replacing problematic characters
+    local safe_name="$(basename "$dest" | sed 's/^\.//g' | tr '/' '-' | tr ' ' '-')"
+    local temp_dir="/tmp/chezmoi-install-${safe_name}-$"
+    
+    echo "📦 Installing $(basename "$dest")..."
+    
+    # Ensure destination is an absolute path
+    if [[ "$dest" != /* ]]; then
+        dest="$HOME/$dest"
+    fi
+    
+    # Create temporary directory
+    mkdir -p "$temp_dir"
+    
+    # Create destination directory with full path
+    mkdir -p "$dest"
+    
+    # Download and extract
+    if ! curl -fsSL "$url" | tar -xz -C "$temp_dir" --strip-components=1; then
+        echo "❌ Failed to download or extract $url"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Copy files to destination (excluding cache directories)
+    if ! rsync -av --exclude='cache/' "$temp_dir/" "$dest/"; then
+        echo "❌ Failed to copy files to $dest"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Cleanup
+    rm -rf "$temp_dir"
+}
+
+# Install Oh My Zsh
+if [ ! -d "$OMZ_DIR" ]; then
+    temp_dir="/tmp/chezmoi-install-oh-my-zsh"
+    mkdir -p "$temp_dir"
+    echo "📦 Installing Oh My Zsh..."
+    
+    # Download and extract oh-my-zsh
+    curl -fsSL "https://github.com/ohmyzsh/ohmyzsh/archive/master.tar.gz" | \
+        tar -xz -C "$temp_dir" --strip-components=1
+    
+    # Create destination and copy files (excluding cache)
+    mkdir -p "$OMZ_DIR"
+    rsync -av --exclude='cache/' "$temp_dir/" "$OMZ_DIR/"
+    
+    # Cleanup
+    rm -rf "$temp_dir"
+else
+    echo "✅ Oh My Zsh already installed"
+fi
+
+# Create custom directories
+mkdir -p "$CUSTOM_DIR/plugins"
+mkdir -p "$CUSTOM_DIR/themes"
+
+# Install zsh-syntax-highlighting
+if [ ! -d "$CUSTOM_DIR/plugins/zsh-syntax-highlighting" ]; then
+    temp_dir="/tmp/chezmoi-install-syntax-highlighting"
+    mkdir -p "$temp_dir"
+    echo "📦 Installing zsh-syntax-highlighting..."
+    
+    curl -fsSL "https://github.com/zsh-users/zsh-syntax-highlighting/archive/master.tar.gz" | \
+        tar -xz -C "$temp_dir" --strip-components=1
+    
+    # Copy only specific files (matching your include pattern)
+    mkdir -p "$CUSTOM_DIR/plugins/zsh-syntax-highlighting"
+    cp "$temp_dir"/*.zsh "$CUSTOM_DIR/plugins/zsh-syntax-highlighting/" 2>/dev/null || true
+    cp "$temp_dir"/.version "$CUSTOM_DIR/plugins/zsh-syntax-highlighting/" 2>/dev/null || true
+    cp "$temp_dir"/.revision-hash "$CUSTOM_DIR/plugins/zsh-syntax-highlighting/" 2>/dev/null || true
+    cp -r "$temp_dir"/highlighters "$CUSTOM_DIR/plugins/zsh-syntax-highlighting/" 2>/dev/null || true
+    
+    rm -rf "$temp_dir"
+else
+    echo "✅ zsh-syntax-highlighting already installed"
+fi
+
+# Install zsh-autosuggestions
+if [ ! -d "$CUSTOM_DIR/plugins/zsh-autosuggestions" ]; then
+    download_and_extract "https://github.com/zsh-users/zsh-autosuggestions/archive/master.tar.gz" "$CUSTOM_DIR/plugins/zsh-autosuggestions"
+else
+    echo "✅ zsh-autosuggestions already installed"
+fi
+
+# Install powerlevel10k theme
+if [ ! -d "$CUSTOM_DIR/themes/powerlevel10k" ]; then
+    temp_dir="/tmp/chezmoi-install-powerlevel10k"
+    mkdir -p "$temp_dir"
+    echo "📦 Installing powerlevel10k theme..."
+    
+    curl -fsSL "https://github.com/romkatv/powerlevel10k/archive/master.tar.gz" | \
+        tar -xz -C "$temp_dir" --strip-components=1
+    
+    # Copy files excluding .zwc files
+    mkdir -p "$CUSTOM_DIR/themes/powerlevel10k"
+    rsync -av --exclude='*.zwc' "$temp_dir/" "$CUSTOM_DIR/themes/powerlevel10k/"
+    
+    rm -rf "$temp_dir"
+else
+    echo "✅ powerlevel10k already installed"
+fi
+
+# Fix permissions for Oh My Zsh and plugins to prevent compinit warnings
+fix_ohmyzsh_permissions() {
+    log_info "🔧 Fixing Oh My Zsh permissions to prevent compinit warnings..."
+    
+    # List of directories to fix permissions for
+    local dirs_to_fix=(
+        "$OMZ_DIR"
+        "$CUSTOM_DIR"
+        "$CUSTOM_DIR/plugins"
+        "$CUSTOM_DIR/themes"
+    )
+    
+    # Add all existing plugin directories
+    if [ -d "$CUSTOM_DIR/plugins" ]; then
+        while IFS= read -r -d '' plugin_dir; do
+            dirs_to_fix+=("$plugin_dir")
+        done < <(find "$CUSTOM_DIR/plugins" -maxdepth 1 -type d -print0 2>/dev/null)
+    fi
+    
+    # Add all existing theme directories
+    if [ -d "$CUSTOM_DIR/themes" ]; then
+        while IFS= read -r -d '' theme_dir; do
+            dirs_to_fix+=("$theme_dir")
+        done < <(find "$CUSTOM_DIR/themes" -maxdepth 1 -type d -print0 2>/dev/null)
+    fi
+    
+    # Fix permissions for each directory
+    for dir in "${dirs_to_fix[@]}"; do
+        if [ -d "$dir" ]; then
+            echo "   🔒 Fixing permissions for: $(basename "$dir")"
+            # Remove group and other write permissions recursively
+            chmod -R go-w "$dir" 2>/dev/null || {
+                log_warning "Could not fix permissions for $dir (this is usually fine)"
+            }
+        fi
+    done
+    
+    # Also fix permissions for the main Oh My Zsh core directories
+    if [ -d "$OMZ_DIR" ]; then
+        echo "   🔒 Fixing core Oh My Zsh directory permissions..."
+        find "$OMZ_DIR" -type d -name "plugins" -o -name "themes" -o -name "lib" -o -name "tools" 2>/dev/null | while read -r dir; do
+            if [ -d "$dir" ]; then
+                chmod -R go-w "$dir" 2>/dev/null || true
+            fi
+        done
+    fi
+    
+    log_success "✅ Oh My Zsh permissions fixed"
+}
+
+# Apply the permission fixes
+fix_ohmyzsh_permissions
+
+# Verify installation and check for permission issues
+verify_installation() {
+    log_info "🔍 Verifying installation and checking for permission issues..."
+    
+    # Check for permission issues using compaudit if available
+    if command -v zsh >/dev/null 2>&1; then
+        echo "   🧪 Testing zsh completion system..."
+        if ! zsh -c 'autoload -U compinit; compinit -u' >/dev/null 2>&1; then
+            log_warning "There might still be some permission issues. You can check with 'compaudit' in zsh."
+            echo "   💡 If you still see warnings, try running: compaudit | xargs chmod -R go-w"
+        else
+            log_success "✅ No permission issues detected"
+        fi
+    fi
+}
+
+# Run verification
+verify_installation
+
+echo ""
+echo "✨ Oh My Zsh installation complete!"
+echo ""
+echo "📝 Next steps:"
+echo "   1. Update your .zshrc to use these plugins:"
+echo "      plugins=(git zsh-syntax-highlighting zsh-autosuggestions)"
+echo "   2. Set your theme:"
+echo "      ZSH_THEME=\"powerlevel10k/powerlevel10k\""
+echo "   3. Restart your shell or run: source ~/.zshrc"
+echo ""
+echo "🔄 To update later, run:"
+echo "   rm -rf ~/.oh-my-zsh && chezmoi apply"
+echo ""
+log_success "🎉 Setup complete! No more 'insecure directories' warnings!"
