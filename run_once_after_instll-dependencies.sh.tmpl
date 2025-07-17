@@ -169,6 +169,32 @@ install_thefuck() {
     log_success "thefuck installed successfully"
 }
 
+# Install gh copilot extension
+install_gh_copilot() {
+    log_info "Installing GitHub Copilot CLI extension..."
+    
+    # Check if gh CLI is available
+    if ! command -v gh &> /dev/null; then
+        log_warning "GitHub CLI (gh) not found. Please install it first."
+        log_info "Install with: brew install gh (macOS) or apt install gh (Ubuntu)"
+        return 0
+    fi
+    
+    # Check if already installed
+    if gh extension list | grep -q "github/gh-copilot"; then
+        log_warning "GitHub Copilot extension already installed"
+        return 0
+    fi
+    
+    # Install the extension
+    if gh extension install github/gh-copilot --force; then
+        log_success "GitHub Copilot extension installed successfully"
+    else
+        log_error "Failed to install GitHub Copilot extension"
+        return 1
+    fi
+}
+
 # Verify installations
 verify_installations() {
     log_info "Verifying installations..."
@@ -198,6 +224,13 @@ verify_installations() {
         log_error "✗ thefuck installation failed"
         all_good=false
     fi
+
+    # Check gh copilot
+    if command -v gh &> /dev/null && gh extension list | grep -q "github/gh-copilot"; then
+        log_success "✓ GitHub Copilot extension is available"
+    else
+        log_warning "⚠ GitHub Copilot extension not available (requires gh CLI)"
+    fi
     
     if [ "$all_good" = true ]; then
         log_success "All dependencies installed successfully!"
@@ -220,7 +253,8 @@ main() {
     install_fzf
     install_asdf
     install_thefuck
-    
+    install_gh_copilot
+
     # Verify everything worked
     verify_installations
     
