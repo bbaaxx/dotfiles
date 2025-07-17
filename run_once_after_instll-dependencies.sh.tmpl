@@ -143,24 +143,36 @@ install_thefuck() {
             log_info "Installing thefuck via Homebrew..."
             brew install thefuck
             ;;
-        "apt")
-            log_info "Installing thefuck via apt..."
-            sudo apt-get update
-            sudo apt-get install -y python3-dev python3-pip python3-setuptools
-            pip3 install --user thefuck
-            ;;
         "pacman")
             log_info "Installing thefuck via pacman..."
             sudo pacman -S --noconfirm thefuck
             ;;
-        *)
-            log_info "Installing thefuck via pip..."
-            if command -v pip3 &> /dev/null; then
-                pip3 install --user thefuck
-            elif command -v pip &> /dev/null; then
-                pip install --user thefuck
+        "apt")
+            log_info "Installing thefuck via apt/pipx..."
+            # First try apt package if available
+            if apt-cache show thefuck &> /dev/null; then
+                sudo apt-get update
+                sudo apt-get install -y thefuck
             else
-                log_error "Neither pip nor pip3 found. Please install Python and pip first."
+                # Use pipx for Python packages in externally managed environments
+                sudo apt-get update
+                sudo apt-get install -y python3-pip python3-venv pipx
+                # Ensure pipx path is available
+                export PATH="$HOME/.local/bin:$PATH"
+                pipx install thefuck
+            fi
+            ;;
+        *)
+            log_info "Installing thefuck via pipx..."
+            # Check if pipx is available
+            if command -v pipx &> /dev/null; then
+                pipx install thefuck
+            elif command -v pip3 &> /dev/null; then
+                # Try with --break-system-packages as last resort
+                log_warning "Using --break-system-packages flag (not recommended but necessary in some environments)"
+                pip3 install --user --break-system-packages thefuck
+            else
+                log_error "Neither pipx nor pip3 found. Please install Python package manager first."
                 return 1
             fi
             ;;
