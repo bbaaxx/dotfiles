@@ -1,10 +1,13 @@
-
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
+
+### PATH Configuration
+# Ensure user-installed binaries are available
+export PATH="$HOME/.local/bin:$PATH"
 
 # Path to your oh-my-zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
@@ -47,29 +50,44 @@ fi
 
 ### CLI Enhancements
 
-# Load FZF
-source <(fzf --zsh)
+# Load FZF - hybrid approach for better compatibility
+if command -v fzf >/dev/null 2>&1; then
+    # Modern method - requires fzf in PATH
+    source <(fzf --zsh)
+elif [ -f ~/.fzf.zsh ]; then
+    # Legacy method - fallback to generated file
+    source ~/.fzf.zsh
+fi
 
-# load thefuck
-eval $(thefuck --alias)
-
+# Load thefuck - check if available before loading
+if command -v thefuck >/dev/null 2>&1; then
+    eval $(thefuck --alias)
+elif [ -f "$HOME/.local/bin/thefuck" ]; then
+    eval $("$HOME/.local/bin/thefuck" --alias)
+fi
 
 ### Alias
 alias codi="code-insiders"
 # This line enables Github Copilot alias commands ghce and ghcs
-eval "$(gh copilot alias -- zsh)"
-
+if command -v gh >/dev/null 2>&1; then
+    eval "$(gh copilot alias -- zsh)"
+fi
 
 ### Package managers and development tools
 
-# Load asdf
-. "$HOME/.asdf/asdf.sh"
+# Load asdf - check if available
+if [ -f "$HOME/.asdf/asdf.sh" ]; then
+    . "$HOME/.asdf/asdf.sh"
+fi
+
 # Load NVM
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-# # Updates PATH for the Google Cloud SDK.
-if [ -f "$HOME/Software/google-cloud-sdk/path.zsh.inc" ]; then . "$HOME/Software/google-cloud-sdk/path.zsh.inc"; fi
 
+# Updates PATH for the Google Cloud SDK.
+if [ -f "$HOME/Software/google-cloud-sdk/path.zsh.inc" ]; then 
+    . "$HOME/Software/google-cloud-sdk/path.zsh.inc"
+fi
 
 ### Auto Completions
 export ZSH_COMPDUMP="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-$ZSH_VERSION"
@@ -77,19 +95,29 @@ export ZSH_COMPDUMP="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-$ZSH_VERSION"
 # The following lines were added by compinstall
 zstyle ':completion:*' completer _complete _ignored
 zstyle :compinstall filename '$HOME/.zshrc'
+
 # NVM completions
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
 # Docker Desktop
-fpath=($HOME/.docker/completions $fpath)
-# Gcloud.
-if [ -f "$HOME/Software/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/Software/google-cloud-sdk/completion.zsh.inc"; fi
+if [ -d "$HOME/.docker/completions" ]; then
+    fpath=($HOME/.docker/completions $fpath)
+fi
+
+# Gcloud completions
+if [ -f "$HOME/Software/google-cloud-sdk/completion.zsh.inc" ]; then 
+    . "$HOME/Software/google-cloud-sdk/completion.zsh.inc"
+fi
+
+# ASDF completions
+if [ -f "$HOME/.asdf/completions/_asdf" ]; then
+    fpath=($HOME/.asdf/completions $fpath)
+fi
 
 # Initialize completions
 autoload -Uz compinit; compinit
 
-
 ### Special configs
-
 
 # Load pyenv
 # >>> conda initialize >>>
@@ -109,4 +137,4 @@ unset __conda_setup
 if [ -f "$HOME/.miniforge3/etc/profile.d/mamba.sh" ]; then
     . "$HOME/.miniforge3/etc/profile.d/mamba.sh"
 fi
-# <<< conda initialize <<<
+# <<< conda initialize <<
